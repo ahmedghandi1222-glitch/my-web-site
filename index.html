@@ -16,7 +16,7 @@
 <body x-data="sagjoyApp()" class="antialiased overflow-x-hidden relative text-slate-800">
 
     <!-- Global Loading State -->
-    <div x-show="isAppLoading" class="loading-overlay z-[9999]" x-transition>
+    <div x-cloak x-show="isAppLoading" class="loading-overlay z-[9999]" x-transition>
         <div class="spinner mb-4"></div>
         <p class="font-bold text-emerald-600 tracking-widest uppercase">Mağaza Başlatılıyor...</p>
     </div>
@@ -74,7 +74,7 @@
         <div class="max-w-7xl mx-auto flex justify-between items-center">
             <div @click="currentView = currentUser?.role === 'admin' ? 'admin' : 'store'"
                 class="flex items-center gap-3 cursor-pointer group">
-                <img src="logo.png" alt="Sağjoy Healthy Snacks"
+                <img src="logo.jpeg" alt="Sağjoy Healthy Snacks"
                     class="w-12 h-12 object-contain group-hover:rotate-[360deg] transition-transform duration-700 ease-in-out drop-shadow-md">
                 <h1
                     class="text-2xl font-black text-emerald-600 tracking-tighter uppercase transition-transform group-hover:scale-105 hidden sm:block">
