@@ -9,30 +9,63 @@ const firebaseConfig = {
     databaseURL: "https://sagjoy-store-default-rtdb.firebaseio.com"
 };
 
-let database;
+let database = null;
+let isFirebaseReady = false;
+
 try {
-    firebase.initializeApp(firebaseConfig);
-    database = firebase.database();
+    if (typeof firebase !== 'undefined') {
+        firebase.initializeApp(firebaseConfig);
+        database = firebase.database();
+        isFirebaseReady = true;
+    } else {
+        console.warn("Firebase SDK not loaded. Using Local Storage fallback.");
+    }
 } catch (e) {
     console.error("Firebase Initialization Error:", e);
 }
 
+// Helper to create a timeout promise
+const timeout = (ms) => new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), ms));
+
 const DB = {
     async get(collection) {
-        try {
-            const snapshot = await database.ref(`sj_store/${collection}`).once('value');
-            return snapshot.val() || [];
-        } catch(e) {
-            console.error("Firebase get error", e);
-            return [];
+        if (isFirebaseReady && database) {
+            try {
+                // Wait for either the database to respond or 3 seconds to pass
+                const snapshot = await Promise.race([
+                    database.ref(`sj_store/${collection}`).once('value'),
+                    timeout(3000)
+                ]);
+                const data = snapshot.val();
+                
+                // Keep local storage in sync as a backup
+                if (data) localStorage.setItem(`sj_store_${collection}`, JSON.stringify(data));
+                
+                return data || [];
+            } catch(e) {
+                console.warn(`Firebase get error or timeout for ${collection}. Falling back to Local Storage.`, e.message);
+                isFirebaseReady = false; // Disable Firebase for subsequent calls to speed things up
+            }
         }
+        // Local Storage Fallback
+        const localData = localStorage.getItem(`sj_store_${collection}`);
+        return localData ? JSON.parse(localData) : [];
     },
     
     async set(collection, data) {
-        try {
-            await database.ref(`sj_store/${collection}`).set(data);
-        } catch(e) {
-            console.error("Firebase set error", e);
+        // Always save to local storage as fallback/backup
+        localStorage.setItem(`sj_store_${collection}`, JSON.stringify(data));
+
+        if (isFirebaseReady && database) {
+            try {
+                await Promise.race([
+                    database.ref(`sj_store/${collection}`).set(data),
+                    timeout(3000)
+                ]);
+            } catch(e) {
+                console.warn(`Firebase set error or timeout for ${collection}. Falling back to Local Storage.`, e.message);
+                isFirebaseReady = false; // Disable Firebase to prevent hanging later
+            }
         }
     },
     // Entity specific methods
@@ -161,8 +194,8 @@ function sagjoyApp() {
                     this.boxProducts = boxes;
                 } else {
                     this.boxProducts = [
-                        { id: 'box-1', name: 'Başlangıç Atıştırmalık Kutusu', price: 29.99, category: 'Paket', description: 'Sağlıklı atıştırmalıklara mükemmel bir giriş. En popüler 10 premium atıştırmalığımızı içerir.' },
-                        { id: 'box-2', name: 'Premium Aylık Kutu', price: 49.99, category: 'Abonelik', description: 'Kapınıza teslim edilen lüks seçimimiz. En yüksek beslenme için özel olarak hazırlanmış 20 premium ürün.' }
+                        { id: 'box-1', name: 'Başlangıç Atıştırmalık Kutusu', price: 29.99, category: 'Paket', description: 'Sağlıklı atıştırmalıklara mükemmel bir giriş. En popüler 10 atıştırmalığımızı içerir.' },
+                        { id: 'box-2', name: 'Aylık Kutu', price: 49.99, category: 'Abonelik', description: 'Kapınıza teslim edilen seçkin ürünlerimiz. En yüksek beslenme için özel olarak hazırlanmış 20 ürün.' }
                     ];
                     await DB.saveBoxProducts(this.boxProducts);
                 }
