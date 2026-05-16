@@ -1,19 +1,33 @@
-// Mock Backend Service
+const firebaseConfig = {
+    apiKey: "AIzaSyBV5jneaIKetpViUC4vDyjIpySY66fujlA",
+    authDomain: "sagjoy-store.firebaseapp.com",
+    projectId: "sagjoy-store",
+    storageBucket: "sagjoy-store.firebasestorage.app",
+    messagingSenderId: "132082956166",
+    appId: "1:132082956166:web:485c9ad9495bf21238de07",
+    measurementId: "G-YJ6VKKNM8G"
+};
+firebase.initializeApp(firebaseConfig);
+const database = firebase.database();
+
 const DB = {
-    async delay(ms = 400) {
-        return new Promise(resolve => setTimeout(resolve, ms));
-    },
-    
     async get(collection) {
-        await this.delay();
-        return JSON.parse(localStorage.getItem(`sj_store_${collection}`)) || [];
+        try {
+            const snapshot = await database.ref(`sj_store/${collection}`).once('value');
+            return snapshot.val() || [];
+        } catch(e) {
+            console.error("Firebase get error", e);
+            return [];
+        }
     },
     
     async set(collection, data) {
-        await this.delay();
-        localStorage.setItem(`sj_store_${collection}`, JSON.stringify(data));
+        try {
+            await database.ref(`sj_store/${collection}`).set(data);
+        } catch(e) {
+            console.error("Firebase set error", e);
+        }
     },
-
     // Entity specific methods
     async getUsers() { return this.get('users'); },
     async saveUsers(users) { return this.set('users', users); },
@@ -54,6 +68,7 @@ function sagjoyApp() {
         brands: [],
         cart: [],
         orders: [],
+        users: [],
 
         // Customer State
         filters: {
@@ -69,6 +84,8 @@ function sagjoyApp() {
         showProductModal: false,
         selectedProduct: null,
         showMobileFilters: false,
+        showReceipt: false,
+        receiptOrder: null,
 
         // Forms
         authForm: { name: '', email: '', password: '', role: 'customer' },
@@ -89,25 +106,56 @@ function sagjoyApp() {
                 }
 
                 // Load initial data
-                const [prods, cats, brnds, ords, boxes] = await Promise.all([
+                const [prods, cats, brnds, ords, boxes, usrs] = await Promise.all([
                     DB.getProducts(),
                     DB.getCategories(),
                     DB.getBrands(),
                     DB.getOrders(),
-                    DB.getBoxProducts()
+                    DB.getBoxProducts(),
+                    DB.getUsers()
                 ]);
                 
-                this.products = prods;
-                this.categories = cats;
-                this.brands = brnds;
+                if (prods && prods.length > 0) {
+                    this.products = prods;
+                } else {
+                    this.products = [
+                        { id: 'p-1', name: 'Organik Fıstık Ezmesi', price: 89.99, brand: 'Doğal', category: 'Atıştırmalık', image: 'https://images.unsplash.com/photo-1599598425947-3300262108bf?w=500&q=80', description: 'Şekersiz, %100 fıstık ezmesi.' },
+                        { id: 'p-2', name: 'Yulaf Bar', price: 24.99, brand: 'Sağlıklı', category: 'Atıştırmalık', image: 'https://images.unsplash.com/photo-1622485507115-46ba022d4f29?w=500&q=80', description: 'Enerji veren doğal yulaf barı.' },
+                        { id: 'p-3', name: 'Soğuk Sıkım Meyve Suyu', price: 45.00, brand: 'Doğal', category: 'İçecek', image: 'https://images.unsplash.com/photo-1600271886742-f049cd451bba?w=500&q=80', description: 'Taze sıkılmış, katkısız meyve suyu.' }
+                    ];
+                    await DB.saveProducts(this.products);
+                }
+
+                if (cats && cats.length > 0) {
+                    this.categories = cats;
+                } else {
+                    this.categories = [
+                        { id: 'c-1', name: 'Atıştırmalık', image: 'https://images.unsplash.com/photo-1599490659213-e2b9527bd087?w=500&q=80' },
+                        { id: 'c-2', name: 'İçecek', image: 'https://images.unsplash.com/photo-1556881286-fc6915169721?w=500&q=80' },
+                        { id: 'c-3', name: 'Tatlı', image: 'https://images.unsplash.com/photo-1551024601-bec78aea704b?w=500&q=80' }
+                    ];
+                    await DB.saveCategories(this.categories);
+                }
+
+                if (brnds && brnds.length > 0) {
+                    this.brands = brnds;
+                } else {
+                    this.brands = [
+                        { id: 'b-1', name: 'Doğal', image: '' },
+                        { id: 'b-2', name: 'Sağlıklı', image: '' }
+                    ];
+                    await DB.saveBrands(this.brands);
+                }
+
                 this.orders = ords;
+                this.users = usrs;
 
                 if (boxes && boxes.length > 0) {
                     this.boxProducts = boxes;
                 } else {
                     this.boxProducts = [
-                        { id: 'box-1', name: 'Starter Snack Box', price: 29.99, category: 'Bundle', description: 'A perfect introduction to healthy snacking. Includes 10 of our most popular premium snacks.' },
-                        { id: 'box-2', name: 'Premium Monthly Box', price: 49.99, category: 'Subscription', description: 'Our deluxe selection delivered to your door. 20 premium items tailored for peak nutrition.' }
+                        { id: 'box-1', name: 'Başlangıç Atıştırmalık Kutusu', price: 29.99, category: 'Paket', description: 'Sağlıklı atıştırmalıklara mükemmel bir giriş. En popüler 10 premium atıştırmalığımızı içerir.' },
+                        { id: 'box-2', name: 'Premium Aylık Kutu', price: 49.99, category: 'Abonelik', description: 'Kapınıza teslim edilen lüks seçimimiz. En yüksek beslenme için özel olarak hazırlanmış 20 premium ürün.' }
                     ];
                     await DB.saveBoxProducts(this.boxProducts);
                 }
@@ -116,7 +164,7 @@ function sagjoyApp() {
                 this.cart = JSON.parse(localStorage.getItem('sj_local_cart')) || [];
                 
             } catch (error) {
-                this.notify('Failed to load store data', 'error');
+                this.notify('Mağaza verileri yüklenemedi', 'error');
             } finally {
                 this.isAppLoading = false;
             }
@@ -132,24 +180,25 @@ function sagjoyApp() {
         // --- AUTHENTICATION ---
         async handleRegister() {
             if (!this.authForm.name || !this.authForm.email || !this.authForm.password) {
-                return this.notify('Please fill all fields', 'error');
+                return this.notify('Lütfen tüm alanları doldurun', 'error');
             }
             if (this.authForm.password.length < 6) {
-                return this.notify('Password must be at least 6 characters', 'error');
+                return this.notify('Şifre en az 6 karakter olmalıdır', 'error');
             }
 
             this.isLoading = true;
             try {
                 const users = await DB.getUsers();
                 if (users.find(u => u.email === this.authForm.email)) {
-                    throw new Error('Email already registered');
+                    throw new Error('E-posta zaten kayıtlı');
                 }
                 const newUser = { ...this.authForm, id: Date.now(), address: '' };
                 users.push(newUser);
                 await DB.saveUsers(users);
+                this.users = users;
                 
                 this.setSession(newUser);
-                this.notify('Account created successfully!');
+                this.notify('Hesap başarıyla oluşturuldu!');
                 this.currentView = 'store';
             } catch (err) {
                 this.notify(err.message, 'error');
@@ -160,7 +209,7 @@ function sagjoyApp() {
 
         async handleLogin() {
             if (!this.authForm.email || !this.authForm.password) {
-                return this.notify('Please enter email and password', 'error');
+                return this.notify('Lütfen e-posta ve şifrenizi girin', 'error');
             }
 
             this.isLoading = true;
@@ -168,10 +217,10 @@ function sagjoyApp() {
                 const users = await DB.getUsers();
                 const user = users.find(u => u.email === this.authForm.email && u.password === this.authForm.password);
                 
-                if (!user) throw new Error('Invalid credentials');
+                if (!user) throw new Error('Geçersiz kimlik bilgileri');
                 
                 this.setSession(user);
-                this.notify('Welcome back!');
+                this.notify('Tekrar hoş geldiniz!');
                 this.currentView = 'store';
             } catch (err) {
                 this.notify(err.message, 'error');
@@ -187,10 +236,10 @@ function sagjoyApp() {
                 if (this.adminAuthForm.email === 'admin@sagjoy.com' && this.adminAuthForm.password === 'admin123') {
                     const adminUser = { id: 0, name: 'Super Admin', email: 'admin@sagjoy.com', role: 'admin' };
                     this.setSession(adminUser);
-                    this.notify('Admin access granted');
+                    this.notify('Yönetici erişimi verildi');
                     this.currentView = 'admin';
                 } else {
-                    throw new Error('Invalid admin credentials');
+                    throw new Error('Geçersiz yönetici kimlik bilgileri');
                 }
             } catch (err) {
                 this.notify(err.message, 'error');
@@ -212,7 +261,7 @@ function sagjoyApp() {
             this.currentUser = null;
             sessionStorage.removeItem('sj_session');
             this.currentView = 'store';
-            this.notify('Logged out successfully');
+            this.notify('Başarıyla çıkış yapıldı');
         },
 
         async updateProfile() {
@@ -224,6 +273,7 @@ function sagjoyApp() {
                     users[idx].name = this.profileForm.name;
                     users[idx].address = this.profileForm.address;
                     await DB.saveUsers(users);
+                    this.users = users;
                 }
                 
                 this.currentUser.name = this.profileForm.name;
@@ -231,9 +281,9 @@ function sagjoyApp() {
                 this.setSession(this.currentUser);
                 
                 this.showProfile = false;
-                this.notify('Profile updated!');
+                this.notify('Profil güncellendi!');
             } catch (e) {
-                this.notify('Failed to update profile', 'error');
+                this.notify('Profil güncellenemedi', 'error');
             } finally {
                 this.isLoading = false;
             }
@@ -295,7 +345,7 @@ function sagjoyApp() {
         addToCart(product) {
             if (!this.currentUser || this.currentUser.role === 'admin') {
                 this.currentView = 'auth';
-                return this.notify('Please login to shop', 'error');
+                return this.notify('Alışveriş yapmak için lütfen giriş yapın', 'error');
             }
             const existing = this.cart.find(i => i.id === product.id);
             if (existing) {
@@ -304,38 +354,43 @@ function sagjoyApp() {
                 this.cart.push({ ...product, qty: 1 });
             }
             this.saveCart();
-            this.notify('Added to cart!');
+            this.notify('Sepete eklendi!');
         },
 
         async buyNow(product) {
             if (!this.currentUser || this.currentUser.role === 'admin') {
                 this.currentView = 'auth';
-                return this.notify('Please login to purchase directly', 'error');
+                return this.notify('Doğrudan satın almak için lütfen giriş yapın', 'error');
             }
             if (!this.currentUser.address) {
                 this.currentView = 'profile';
-                return this.notify('Please add a delivery address to complete direct purchase', 'warning');
+                return this.notify('Doğrudan satın almayı tamamlamak için lütfen bir teslimat adresi ekleyin', 'warning');
+            }
+            if (product.price < 200) {
+                return this.notify('Sipariş verebilmek için ürün tutarının ₺200\'dan fazla olması gerekmektedir.', 'error');
             }
 
             this.isLoading = true;
             try {
                 const newOrder = {
                     id: 'ORD-' + Math.random().toString(36).substr(2, 9).toUpperCase(),
-                    userId: this.currentUser.email,
+                    userId: this.currentUser.id,
                     customerName: this.currentUser.name,
                     address: this.currentUser.address,
                     items: [{ ...product, qty: 1 }],
                     total: product.price,
                     date: new Date().toISOString(),
-                    status: 'Processing'
+                    status: 'İşleniyor'
                 };
                 
                 this.orders.unshift(newOrder);
                 await DB.saveOrders(this.orders);
                 
-                this.notify('Direct purchase successful! 🎉');
+                this.receiptOrder = newOrder;
+                this.showReceipt = true;
+                this.notify('Doğrudan satın alma başarılı! 🎉');
             } catch (e) {
-                this.notify('Purchase failed. Try again.', 'error');
+                this.notify('Satın alma başarısız oldu. Tekrar deneyin.', 'error');
             } finally {
                 this.isLoading = false;
             }
@@ -357,7 +412,10 @@ function sagjoyApp() {
             if (!this.currentUser.address) {
                 this.showProfile = true;
                 this.showCart = false;
-                return this.notify('Please provide a shipping address first', 'error');
+                return this.notify('Lütfen önce bir teslimat adresi belirtin', 'error');
+            }
+            if (this.cartTotal < 200) {
+                return this.notify('Sipariş verebilmek için sepet tutarının ₺200\'dan fazla olması gerekmektedir.', 'error');
             }
 
             this.isLoading = true;
@@ -370,7 +428,7 @@ function sagjoyApp() {
                     items: [...this.cart],
                     total: this.cartTotal,
                     date: new Date().toISOString(),
-                    status: 'Processing'
+                    status: 'İşleniyor'
                 };
                 
                 this.orders.unshift(newOrder);
@@ -379,9 +437,71 @@ function sagjoyApp() {
                 this.cart = [];
                 this.saveCart();
                 this.showCart = false;
-                this.notify('Order placed successfully! 🎉');
+                
+                this.receiptOrder = newOrder;
+                this.showReceipt = true;
+                this.notify('Sipariş başarıyla verildi! 🎉');
             } catch (e) {
-                this.notify('Checkout failed. Try again.', 'error');
+                this.notify('Ödeme başarısız oldu. Tekrar deneyin.', 'error');
+            } finally {
+                this.isLoading = false;
+            }
+        },
+
+        // --- MY ORDERS ---
+        get myOrders() {
+            if (!this.currentUser) return [];
+            return this.orders.filter(o => o.userId === this.currentUser.id || o.userId === this.currentUser.email);
+        },
+
+        async cancelMyOrder(id) {
+            if (!confirm('Siparişinizi iptal etmek istediğinize emin misiniz?')) return;
+            this.isLoading = true;
+            try {
+                const idx = this.orders.findIndex(o => o.id === id);
+                if (idx > -1) {
+                    this.orders[idx].status = 'İptal Edildi';
+                    await DB.saveOrders(this.orders);
+                    this.notify('Sipariş iptal edildi');
+                }
+            } catch (e) {
+                this.notify('Sipariş iptal edilemedi', 'error');
+            } finally {
+                this.isLoading = false;
+            }
+        },
+
+        async modifyMyOrder(id) {
+            const idx = this.orders.findIndex(o => o.id === id);
+            if (idx === -1) return;
+            const orderToModify = this.orders[idx];
+            
+            if (orderToModify.status !== 'İşleniyor') {
+                return this.notify('Sadece işlenmekte olan siparişler düzenlenebilir', 'error');
+            }
+
+            if (!confirm('Siparişi düzenlemek için mevcut sipariş iptal edilecek ve ürünler sepete eklenecektir. Onaylıyor musunuz?')) return;
+            
+            this.isLoading = true;
+            try {
+                orderToModify.items.forEach(item => {
+                    const existing = this.cart.find(i => i.id === item.id);
+                    if (existing) {
+                        existing.qty += item.qty;
+                    } else {
+                        this.cart.push({ ...item });
+                    }
+                });
+                this.saveCart();
+
+                this.orders[idx].status = 'İptal Edildi';
+                await DB.saveOrders(this.orders);
+                
+                this.showProfile = false;
+                this.showCart = true;
+                this.notify('Sipariş iptal edildi, ürünler sepete eklendi');
+            } catch (e) {
+                this.notify('Sipariş düzenlenemedi', 'error');
             } finally {
                 this.isLoading = false;
             }
@@ -412,7 +532,7 @@ function sagjoyApp() {
 
         async saveProduct() {
             if (!this.productForm.name || !this.productForm.price || !this.productForm.category) {
-                return this.notify('Fill required fields', 'error');
+                return this.notify('Gerekli alanları doldurun', 'error');
             }
             this.isLoading = true;
             try {
@@ -426,23 +546,23 @@ function sagjoyApp() {
                 }
                 await DB.saveProducts(this.products);
                 this.resetProductForm();
-                this.notify('Product saved successfully');
+                this.notify('Ürün başarıyla kaydedildi');
             } catch (e) {
-                this.notify('Failed to save product', 'error');
+                this.notify('Ürün kaydedilemedi', 'error');
             } finally {
                 this.isLoading = false;
             }
         },
 
         async deleteProduct(id) {
-            if (!confirm('Are you sure you want to delete this product?')) return;
+            if (!confirm('Bu ürünü silmek istediğinize emin misiniz?')) return;
             this.isLoading = true;
             try {
                 this.products = this.products.filter(p => p.id !== id);
                 await DB.saveProducts(this.products);
-                this.notify('Product deleted');
+                this.notify('Ürün silindi');
             } catch (e) {
-                this.notify('Delete failed', 'error');
+                this.notify('Silme başarısız', 'error');
             } finally {
                 this.isLoading = false;
             }
@@ -467,7 +587,7 @@ function sagjoyApp() {
         },
 
         async saveCategory() {
-            if (!this.categoryForm.name) return this.notify('Name is required', 'error');
+            if (!this.categoryForm.name) return this.notify('İsim gereklidir', 'error');
             this.isLoading = true;
             try {
                 if (this.categoryForm.id) {
@@ -478,23 +598,23 @@ function sagjoyApp() {
                 }
                 await DB.saveCategories(this.categories);
                 this.resetCategoryForm();
-                this.notify('Category saved successfully');
+                this.notify('Kategori başarıyla kaydedildi');
             } catch (e) {
-                this.notify('Failed to save category', 'error');
+                this.notify('Kategori kaydedilemedi', 'error');
             } finally {
                 this.isLoading = false;
             }
         },
 
         async deleteCategory(id) {
-            if (!confirm('Delete this category?')) return;
+            if (!confirm('Bu kategoriyi silmek istiyor musunuz?')) return;
             this.isLoading = true;
             try {
                 this.categories = this.categories.filter(c => c.id !== id);
                 await DB.saveCategories(this.categories);
-                this.notify('Category deleted');
+                this.notify('Kategori silindi');
             } catch (e) {
-                this.notify('Delete failed', 'error');
+                this.notify('Silme başarısız', 'error');
             } finally {
                 this.isLoading = false;
             }
@@ -510,7 +630,7 @@ function sagjoyApp() {
         },
 
         async saveBrand() {
-            if (!this.brandForm.name) return this.notify('Brand name is required', 'error');
+            if (!this.brandForm.name) return this.notify('Marka adı gereklidir', 'error');
             this.isLoading = true;
             try {
                 if (this.brandForm.id) {
@@ -521,23 +641,23 @@ function sagjoyApp() {
                 }
                 await DB.saveBrands(this.brands);
                 this.resetBrandForm();
-                this.notify('Brand saved successfully!');
+                this.notify('Marka başarıyla kaydedildi!');
             } catch (e) {
-                this.notify('Failed to save brand', 'error');
+                this.notify('Marka kaydedilemedi', 'error');
             } finally {
                 this.isLoading = false;
             }
         },
 
         async deleteBrand(id) {
-            if (!confirm('Delete this brand?')) return;
+            if (!confirm('Bu markayı silmek istiyor musunuz?')) return;
             this.isLoading = true;
             try {
                 this.brands = this.brands.filter(b => b.id !== id);
                 await DB.saveBrands(this.brands);
-                this.notify('Brand deleted');
+                this.notify('Marka silindi');
             } catch (e) {
-                this.notify('Delete failed', 'error');
+                this.notify('Silme başarısız', 'error');
             } finally {
                 this.isLoading = false;
             }
@@ -553,7 +673,7 @@ function sagjoyApp() {
         },
 
         async saveBox() {
-            if (!this.boxForm.name || !this.boxForm.price) return this.notify('Name and Price are required', 'error');
+            if (!this.boxForm.name || !this.boxForm.price) return this.notify('İsim ve Fiyat gereklidir', 'error');
             this.isLoading = true;
             try {
                 if (this.boxForm.id) {
@@ -564,37 +684,37 @@ function sagjoyApp() {
                 }
                 await DB.saveBoxProducts(this.boxProducts);
                 this.resetBoxForm();
-                this.notify('Box saved successfully!');
+                this.notify('Kutu başarıyla kaydedildi!');
             } catch (e) {
-                this.notify('Failed to save box', 'error');
+                this.notify('Kutu kaydedilemedi', 'error');
             } finally {
                 this.isLoading = false;
             }
         },
 
         async deleteBox(id) {
-            if (!confirm('Delete this box?')) return;
+            if (!confirm('Bu kutuyu silmek istiyor musunuz?')) return;
             this.isLoading = true;
             try {
                 this.boxProducts = this.boxProducts.filter(b => b.id !== id);
                 await DB.saveBoxProducts(this.boxProducts);
-                this.notify('Box deleted');
+                this.notify('Kutu silindi');
             } catch (e) {
-                this.notify('Delete failed', 'error');
+                this.notify('Silme başarısız', 'error');
             } finally {
                 this.isLoading = false;
             }
         },
 
         async deleteOrder(id) {
-            if (!confirm('Permanently delete this order?')) return;
+            if (!confirm('Bu siparişi kalıcı olarak silmek istiyor musunuz?')) return;
             this.isLoading = true;
             try {
                 this.orders = this.orders.filter(o => o.id !== id);
                 await DB.saveOrders(this.orders);
-                this.notify('Order deleted');
+                this.notify('Sipariş silindi');
             } catch (e) {
-                this.notify('Failed to delete order', 'error');
+                this.notify('Sipariş silinemedi', 'error');
             } finally {
                 this.isLoading = false;
             }
@@ -606,9 +726,9 @@ function sagjoyApp() {
                 const idx = this.orders.findIndex(o => o.id === id);
                 this.orders[idx].status = newStatus;
                 await DB.saveOrders(this.orders);
-                this.notify(`Order marked as ${newStatus}`);
+                this.notify(`Sipariş ${newStatus} olarak işaretlendi`);
             } catch (e) {
-                this.notify('Failed to update order', 'error');
+                this.notify('Sipariş güncellenemedi', 'error');
             } finally {
                 this.isLoading = false;
             }
