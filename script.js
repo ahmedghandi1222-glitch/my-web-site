@@ -5,10 +5,17 @@ const firebaseConfig = {
     storageBucket: "sagjoy-store.firebasestorage.app",
     messagingSenderId: "132082956166",
     appId: "1:132082956166:web:485c9ad9495bf21238de07",
-    measurementId: "G-YJ6VKKNM8G"
+    measurementId: "G-YJ6VKKNM8G",
+    databaseURL: "https://sagjoy-store-default-rtdb.firebaseio.com"
 };
-firebase.initializeApp(firebaseConfig);
-const database = firebase.database();
+
+let database;
+try {
+    firebase.initializeApp(firebaseConfig);
+    database = firebase.database();
+} catch (e) {
+    console.error("Firebase Initialization Error:", e);
+}
 
 const DB = {
     async get(collection) {
