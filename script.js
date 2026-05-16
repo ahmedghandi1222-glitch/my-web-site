@@ -85,7 +85,10 @@ const DB = {
     async saveBoxProducts(boxProducts) { return this.set('boxProducts', boxProducts); },
 
     async getOrders() { return this.get('orders'); },
-    async saveOrders(orders) { return this.set('orders', orders); }
+    async saveOrders(orders) { return this.set('orders', orders); },
+
+    async getIngredients() { return this.get('ingredients'); },
+    async saveIngredients(ingredients) { return this.set('ingredients', ingredients); }
 };
 
 // Main App Controller
@@ -106,6 +109,7 @@ function sagjoyApp() {
         boxProducts: [],
         categories: [],
         brands: [],
+        ingredients: [],
         cart: [],
         orders: [],
         users: [],
@@ -115,6 +119,7 @@ function sagjoyApp() {
             category: 'all',
             search: '',
             brand: '',
+            ingredient: '',
             minPrice: '',
             maxPrice: '',
             sort: 'default'
@@ -130,9 +135,10 @@ function sagjoyApp() {
         // Forms
         authForm: { name: '', email: '', password: '', role: 'customer' },
         adminAuthForm: { email: '', password: '' },
-        productForm: { id: null, name: '', price: '', brand: '', category: '', image: '', description: '' },
+        productForm: { id: null, name: '', price: '', brand: '', category: '', ingredient: '', image: '', description: '' },
         categoryForm: { id: null, name: '', image: '' },
         brandForm: { id: null, name: '', image: '' },
+        ingredientForm: { id: null, name: '', image: '' },
         boxForm: { id: null, name: '', price: '', category: '', description: '', image: '' },
         profileForm: { name: '', address: '' },
 
@@ -146,13 +152,14 @@ function sagjoyApp() {
                 }
 
                 // Load initial data
-                const [prods, cats, brnds, ords, boxes, usrs] = await Promise.all([
+                const [prods, cats, brnds, ords, boxes, usrs, ings] = await Promise.all([
                     DB.getProducts(),
                     DB.getCategories(),
                     DB.getBrands(),
                     DB.getOrders(),
                     DB.getBoxProducts(),
-                    DB.getUsers()
+                    DB.getUsers(),
+                    DB.getIngredients()
                 ]);
                 
                 if (prods && prods.length > 0) {
@@ -185,6 +192,17 @@ function sagjoyApp() {
                         { id: 'b-2', name: 'Sağlıklı', image: '' }
                     ];
                     await DB.saveBrands(this.brands);
+                }
+
+                if (ings && ings.length > 0) {
+                    this.ingredients = ings;
+                } else {
+                    this.ingredients = [
+                        { id: 'i-1', name: 'Yulaf', image: '' },
+                        { id: 'i-2', name: 'Fıstık', image: '' },
+                        { id: 'i-3', name: 'Hurma', image: '' }
+                    ];
+                    await DB.saveIngredients(this.ingredients);
                 }
 
                 this.orders = ords;
@@ -338,15 +356,20 @@ function sagjoyApp() {
             return [...this.brands].sort((a, b) => a.name.localeCompare(b.name));
         },
 
+        get activeIngredients() {
+            return [...this.ingredients].sort((a, b) => a.name.localeCompare(b.name));
+        },
+
         get filteredProducts() {
             let result = this.products.filter(p => {
                 const f = this.filters;
                 const matchCat = f.category === 'all' || p.category === f.category;
                 const matchSearch = p.name.toLowerCase().includes(f.search.toLowerCase());
                 const matchBrand = f.brand === '' || p.brand === f.brand;
+                const matchIngredient = f.ingredient === '' || p.ingredient === f.ingredient;
                 const matchMin = f.minPrice === '' || p.price >= Number(f.minPrice);
                 const matchMax = f.maxPrice === '' || p.price <= Number(f.maxPrice);
-                return matchCat && matchSearch && matchBrand && matchMin && matchMax;
+                return matchCat && matchSearch && matchBrand && matchIngredient && matchMin && matchMax;
             });
 
             switch (this.filters.sort) {
@@ -565,6 +588,7 @@ function sagjoyApp() {
                 if (target === 'product') this.productForm.image = event.target.result;
                 if (target === 'category') this.categoryForm.image = event.target.result;
                 if (target === 'brand') this.brandForm.image = event.target.result;
+                if (target === 'ingredient') this.ingredientForm.image = event.target.result;
                 if (target === 'box') this.boxForm.image = event.target.result;
             };
             reader.readAsDataURL(file);
@@ -614,7 +638,7 @@ function sagjoyApp() {
         },
 
         resetProductForm() {
-            this.productForm = { id: null, name: '', price: '', brand: '', category: '', image: '', description: '' };
+            this.productForm = { id: null, name: '', price: '', brand: '', category: '', ingredient: '', image: '', description: '' };
         },
 
         editCategory(c) {
@@ -653,6 +677,49 @@ function sagjoyApp() {
                 this.categories = this.categories.filter(c => c.id !== id);
                 await DB.saveCategories(this.categories);
                 this.notify('Kategori silindi');
+            } catch (e) {
+                this.notify('Silme başarısız', 'error');
+            } finally {
+                this.isLoading = false;
+            }
+        },
+
+        editIngredient(i) {
+            this.ingredientForm = { ...i };
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        },
+
+        resetIngredientForm() {
+            this.ingredientForm = { id: null, name: '', image: '' };
+        },
+
+        async saveIngredient() {
+            if (!this.ingredientForm.name) return this.notify('İçerik adı gereklidir', 'error');
+            this.isLoading = true;
+            try {
+                if (this.ingredientForm.id) {
+                    const idx = this.ingredients.findIndex(i => i.id === this.ingredientForm.id);
+                    this.ingredients[idx] = { ...this.ingredientForm };
+                } else {
+                    this.ingredients.push({ ...this.ingredientForm, id: Date.now() });
+                }
+                await DB.saveIngredients(this.ingredients);
+                this.resetIngredientForm();
+                this.notify('İçerik başarıyla kaydedildi!');
+            } catch (e) {
+                this.notify('İçerik kaydedilemedi', 'error');
+            } finally {
+                this.isLoading = false;
+            }
+        },
+
+        async deleteIngredient(id) {
+            if (!confirm('Bu içeriği silmek istiyor musunuz?')) return;
+            this.isLoading = true;
+            try {
+                this.ingredients = this.ingredients.filter(i => i.id !== id);
+                await DB.saveIngredients(this.ingredients);
+                this.notify('İçerik silindi');
             } catch (e) {
                 this.notify('Silme başarısız', 'error');
             } finally {

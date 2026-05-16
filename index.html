@@ -253,13 +253,15 @@
             <div class="lg:hidden flex justify-between items-center mb-6 px-2">
                 <h2 class="text-xl font-black text-slate-800">Ürünlerimiz</h2>
                 <button @click="showMobileFilters = true"
-                    class="flex items-center gap-2 px-5 py-2.5 bg-emerald-100 text-emerald-700 rounded-xl font-bold hover:bg-emerald-200 transition-colors shadow-sm">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    class="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2 sm:py-2.5 bg-emerald-100 text-emerald-700 rounded-xl font-bold hover:bg-emerald-200 transition-colors shadow-sm text-sm sm:text-base whitespace-nowrap">
+                    <svg class="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" fill="none" stroke="currentColor"
+                        viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4">
                         </path>
                     </svg>
-                    Filtrele ve Sırala
+                    <span class="hidden sm:inline">Filtrele ve Sırala</span>
+                    <span class="sm:hidden">Filtrele</span>
                 </button>
             </div>
 
@@ -1008,80 +1010,50 @@
                 <!-- Sort -->
                 <div class="space-y-3">
                     <label class="text-sm font-bold text-slate-500 uppercase tracking-wider">Sıralama</label>
-                    <div class="space-y-2">
-                        <template
-                            x-for="s in [{val: 'default', label: 'Varsayılan Sıralama'}, {val: 'price_asc', label: 'Fiyat: Düşükten Yükseğe'}, {val: 'price_desc', label: 'Fiyat: Yüksekten Düşüğe'}, {val: 'name_asc', label: 'İsim: A-Z'}, {val: 'name_desc', label: 'İsim: Z-A'}]"
-                            :key="s.val">
-                            <label class="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors"
-                                :class="filters.sort === s.val ? 'bg-emerald-50 text-emerald-700' : 'hover:bg-slate-50'">
-                                <input type="radio" x-model="filters.sort" :value="s.val" class="hidden">
-                                <div class="w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors"
-                                    :class="filters.sort === s.val ? 'border-emerald-500' : 'border-slate-300'">
-                                    <div x-show="filters.sort === s.val"
-                                        class="w-2.5 h-2.5 rounded-full bg-emerald-500"></div>
-                                </div>
-                                <span class="font-bold flex-1 text-sm text-slate-800" x-text="s.label"></span>
-                            </label>
-                        </template>
-                    </div>
+                    <select x-model="filters.sort"
+                        class="w-full p-4 bg-slate-50 rounded-2xl outline-none input-field font-semibold text-slate-700 cursor-pointer">
+                        <option value="default">Varsayılan Sıralama</option>
+                        <option value="price_asc">Fiyat: Düşükten Yükseğe</option>
+                        <option value="price_desc">Fiyat: Yüksekten Düşüğe</option>
+                        <option value="name_asc">İsim: A-Z</option>
+                        <option value="name_desc">İsim: Z-A</option>
+                    </select>
                 </div>
 
                 <!-- Categories -->
                 <div class="space-y-3">
                     <label class="text-sm font-bold text-slate-500 uppercase tracking-wider">Kategoriler</label>
-                    <div class="space-y-2">
-                        <label class="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors"
-                            :class="filters.category === 'all' ? 'bg-emerald-50 text-emerald-700' : 'hover:bg-slate-50'">
-                            <input type="radio" x-model="filters.category" value="all" class="hidden">
-                            <div class="w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors"
-                                :class="filters.category === 'all' ? 'border-emerald-500' : 'border-slate-300'">
-                                <div x-show="filters.category === 'all'"
-                                    class="w-2.5 h-2.5 rounded-full bg-emerald-500"></div>
-                            </div>
-                            <span class="font-bold text-slate-800">Tüm Kategoriler</span>
-                        </label>
+                    <select x-model="filters.category"
+                        class="w-full p-4 bg-slate-50 rounded-2xl outline-none input-field font-semibold text-slate-700 cursor-pointer">
+                        <option value="all">Tüm Kategoriler</option>
                         <template x-for="c in sortedCategories" :key="c.id">
-                            <label class="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors"
-                                :class="filters.category === c.name ? 'bg-emerald-50 text-emerald-700' : 'hover:bg-slate-50'">
-                                <input type="radio" x-model="filters.category" :value="c.name" class="hidden">
-                                <div class="w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors"
-                                    :class="filters.category === c.name ? 'border-emerald-500' : 'border-slate-300'">
-                                    <div x-show="filters.category === c.name"
-                                        class="w-2.5 h-2.5 rounded-full bg-emerald-500"></div>
-                                </div>
-                                <span class="font-bold flex-1 text-slate-800" x-text="c.name"></span>
-                            </label>
+                            <option :value="c.name" x-text="c.name"></option>
                         </template>
-                    </div>
+                    </select>
                 </div>
 
                 <!-- Brands -->
                 <div class="space-y-3">
                     <label class="text-sm font-bold text-slate-500 uppercase tracking-wider">Markalar</label>
-                    <div class="space-y-2 max-h-48 overflow-y-auto no-scrollbar pr-2">
-                        <label class="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors"
-                            :class="filters.brand === '' ? 'bg-emerald-50 text-emerald-700' : 'hover:bg-slate-50'">
-                            <input type="radio" x-model="filters.brand" value="" class="hidden">
-                            <div class="w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors"
-                                :class="filters.brand === '' ? 'border-emerald-500' : 'border-slate-300'">
-                                <div x-show="filters.brand === ''" class="w-2.5 h-2.5 rounded-full bg-emerald-500">
-                                </div>
-                            </div>
-                            <span class="font-bold text-sm text-slate-800">Tüm Markalar</span>
-                        </label>
+                    <select x-model="filters.brand"
+                        class="w-full p-4 bg-slate-50 rounded-2xl outline-none input-field font-semibold text-slate-700 cursor-pointer">
+                        <option value="">Tüm Markalar</option>
                         <template x-for="b in activeBrands" :key="b.id">
-                            <label class="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors"
-                                :class="filters.brand === b.name ? 'bg-emerald-50 text-emerald-700' : 'hover:bg-slate-50'">
-                                <input type="radio" x-model="filters.brand" :value="b.name" class="hidden">
-                                <div class="w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors"
-                                    :class="filters.brand === b.name ? 'border-emerald-500' : 'border-slate-300'">
-                                    <div x-show="filters.brand === b.name"
-                                        class="w-2.5 h-2.5 rounded-full bg-emerald-500"></div>
-                                </div>
-                                <span class="font-bold flex-1 text-sm text-slate-800" x-text="b.name"></span>
-                            </label>
+                            <option :value="b.name" x-text="b.name"></option>
                         </template>
-                    </div>
+                    </select>
+                </div>
+
+                <!-- Ingredients -->
+                <div class="space-y-3">
+                    <label class="text-sm font-bold text-slate-500 uppercase tracking-wider">İçindekiler</label>
+                    <select x-model="filters.ingredient"
+                        class="w-full p-4 bg-slate-50 rounded-2xl outline-none input-field font-semibold text-slate-700 cursor-pointer">
+                        <option value="">Tüm İçerikler</option>
+                        <template x-for="i in activeIngredients" :key="i.id">
+                            <option :value="i.name" x-text="i.name"></option>
+                        </template>
+                    </select>
                 </div>
 
                 <!-- Price Range -->
