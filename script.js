@@ -34,7 +34,7 @@ const DB = {
                 // Wait for either the database to respond or 3 seconds to pass
                 const snapshot = await Promise.race([
                     database.ref(`sj_store/${collection}`).once('value'),
-                    timeout(3000)
+                    timeout(10000)
                 ]);
                 const data = snapshot.val();
                 
@@ -44,7 +44,7 @@ const DB = {
                 return data || [];
             } catch(e) {
                 console.warn(`Firebase get error or timeout for ${collection}. Falling back to Local Storage.`, e.message);
-                isFirebaseReady = false; // Disable Firebase for subsequent calls to speed things up
+                // We no longer disable Firebase here so it can recover on the next try or via real-time sync
             }
         }
         // Local Storage Fallback
@@ -60,11 +60,11 @@ const DB = {
             try {
                 await Promise.race([
                     database.ref(`sj_store/${collection}`).set(data),
-                    timeout(3000)
+                    timeout(10000)
                 ]);
             } catch(e) {
                 console.warn(`Firebase set error or timeout for ${collection}. Falling back to Local Storage.`, e.message);
-                isFirebaseReady = false; // Disable Firebase to prevent hanging later
+                // We no longer disable Firebase here so future saves can still attempt to write to DB
             }
         }
     },
