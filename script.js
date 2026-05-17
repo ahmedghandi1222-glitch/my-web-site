@@ -131,6 +131,8 @@ function sagjoyApp() {
         showMobileFilters: false,
         showReceipt: false,
         receiptOrder: null,
+        showPayment: false,
+        pendingBuyNowProduct: null,
 
         // Forms
         authForm: { name: '', email: '', password: '', role: 'customer' },
@@ -141,6 +143,7 @@ function sagjoyApp() {
         ingredientForm: { id: null, name: '', image: '' },
         boxForm: { id: null, name: '', price: '', category: '', description: '', image: '' },
         profileForm: { name: '', address: '' },
+        paymentForm: { name: '', cardNumber: '', expiry: '', cvv: '' },
 
         async init() {
             try {
@@ -220,6 +223,29 @@ function sagjoyApp() {
 
                 // Load local cart
                 this.cart = JSON.parse(localStorage.getItem('sj_local_cart')) || [];
+                
+                // Setup Real-time Data Sync
+                if (isFirebaseReady && database) {
+                    database.ref('sj_store').on('value', (snapshot) => {
+                        const data = snapshot.val();
+                        if (data) {
+                            if (data.products) this.products = data.products;
+                            if (data.categories) this.categories = data.categories;
+                            if (data.brands) this.brands = data.brands;
+                            if (data.orders) this.orders = data.orders;
+                            if (data.boxProducts) this.boxProducts = data.boxProducts;
+                            if (data.users) {
+                                this.users = data.users;
+                                // Update current user session if it was modified
+                                if (this.currentUser) {
+                                    const updatedUser = data.users.find(u => u.id === this.currentUser.id);
+                                    if (updatedUser) this.setSession(updatedUser);
+                                }
+                            }
+                            if (data.ingredients) this.ingredients = data.ingredients;
+                        }
+                    });
+                }
                 
             } catch (error) {
                 this.notify('Mağaza verileri yüklenemedi', 'error');
@@ -420,7 +446,7 @@ function sagjoyApp() {
             this.notify('Sepete eklendi!');
         },
 
-        async buyNow(product) {
+        buyNow(product) {
             if (!this.currentUser || this.currentUser.role === 'admin') {
                 this.currentView = 'auth';
                 return this.notify('Doğrudan satın almak için lütfen giriş yapın', 'error');
@@ -433,30 +459,9 @@ function sagjoyApp() {
                 return this.notify('Sipariş verebilmek için ürün tutarının ₺200\'dan fazla olması gerekmektedir.', 'error');
             }
 
-            this.isLoading = true;
-            try {
-                const newOrder = {
-                    id: 'ORD-' + Math.random().toString(36).substr(2, 9).toUpperCase(),
-                    userId: this.currentUser.id,
-                    customerName: this.currentUser.name,
-                    address: this.currentUser.address,
-                    items: [{ ...product, qty: 1 }],
-                    total: product.price,
-                    date: new Date().toISOString(),
-                    status: 'İşleniyor'
-                };
-                
-                this.orders.unshift(newOrder);
-                await DB.saveOrders(this.orders);
-                
-                this.receiptOrder = newOrder;
-                this.showReceipt = true;
-                this.notify('Doğrudan satın alma başarılı! 🎉');
-            } catch (e) {
-                this.notify('Satın alma başarısız oldu. Tekrar deneyin.', 'error');
-            } finally {
-                this.isLoading = false;
-            }
+            this.pendingBuyNowProduct = product;
+            this.showProductModal = false;
+            this.showPayment = true;
         },
 
         updateCartQty(index, delta) {
@@ -471,7 +476,7 @@ function sagjoyApp() {
             localStorage.setItem('sj_local_cart', JSON.stringify(this.cart));
         },
 
-        async checkout() {
+        checkout() {
             if (!this.currentUser.address) {
                 this.showProfile = true;
                 this.showCart = false;
@@ -481,15 +486,34 @@ function sagjoyApp() {
                 return this.notify('Sipariş verebilmek için sepet tutarının ₺200\'dan fazla olması gerekmektedir.', 'error');
             }
 
+            this.pendingBuyNowProduct = null;
+            this.showCart = false;
+            this.showPayment = true;
+        },
+
+        async processPayment() {
+            if (!this.paymentForm.name || !this.paymentForm.cardNumber || !this.paymentForm.expiry || !this.paymentForm.cvv) {
+                return this.notify('Lütfen tüm kart bilgilerini doldurun', 'error');
+            }
+
             this.isLoading = true;
             try {
+                let items, total;
+                if (this.pendingBuyNowProduct) {
+                    items = [{ ...this.pendingBuyNowProduct, qty: 1 }];
+                    total = this.pendingBuyNowProduct.price;
+                } else {
+                    items = [...this.cart];
+                    total = this.cartTotal;
+                }
+
                 const newOrder = {
                     id: 'ORD-' + Math.random().toString(36).substr(2, 6).toUpperCase(),
                     userId: this.currentUser.id,
                     customerName: this.currentUser.name,
                     address: this.currentUser.address,
-                    items: [...this.cart],
-                    total: this.cartTotal,
+                    items: items,
+                    total: total,
                     date: new Date().toISOString(),
                     status: 'İşleniyor'
                 };
@@ -497,13 +521,18 @@ function sagjoyApp() {
                 this.orders.unshift(newOrder);
                 await DB.saveOrders(this.orders);
                 
-                this.cart = [];
-                this.saveCart();
-                this.showCart = false;
+                if (!this.pendingBuyNowProduct) {
+                    this.cart = [];
+                    this.saveCart();
+                }
+                
+                this.showPayment = false;
+                this.paymentForm = { name: '', cardNumber: '', expiry: '', cvv: '' };
+                this.pendingBuyNowProduct = null;
                 
                 this.receiptOrder = newOrder;
                 this.showReceipt = true;
-                this.notify('Sipariş başarıyla verildi! 🎉');
+                this.notify('Ödeme başarılı! Siparişiniz alındı 🎉');
             } catch (e) {
                 this.notify('Ödeme başarısız oldu. Tekrar deneyin.', 'error');
             } finally {
